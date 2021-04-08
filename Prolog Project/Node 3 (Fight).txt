@@ -1,0 +1,24 @@
+(guard_hp = 8)
+(guard_atk = 2)
+(guard_def = 0)
+
+1) You find another guard with his back turned. He has a pouch full of gold in hanging from his belt and there is a chainmail shirt on the table behind him. 
+   Fight him or try to sneak around? (F/S)
+	F = (Go to 2)
+	S = (Go to 6)
+
+2) You strike the guard with your club, landing a critical hit because he was unaware. He takes (player_atk * 2) damage. Attack him again? (Y/N)
+	Y = (Go to 4)
+	N = (Go to 3)
+
+3) The guard seizes you and puts you in handcuffs, taking you back to the prison cell to await your execution the following morning. (Game Over)
+
+4) You attack the guard, dealing (player_atk - guard_def) damage. The guard retaliates with his club, dealing (guard_atk - player_def) damage. Attack again? (Y/N)
+	Y = If guard_hp = 0, (Go to node 5), else (Go to node 4)
+	N = (Go to node 3)
+
+5) The guard falls to the ground. You find 10 gold in his coin pouch and equip the chainmail shirt (3 def). (Next)
+
+6) Again, there are two doors in front of you. Take the left door or the right door? (L/R)
+	L = (Go to node 4)
+	R = (Go to node 5)
