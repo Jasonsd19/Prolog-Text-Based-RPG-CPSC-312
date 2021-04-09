@@ -1,4 +1,4 @@
-:- dynamic current_node_is/1, equipped/2, located/2.
+:- dynamic current_node_is/1, equipped/2, located/2, health/2, defense/2, attack/2, magic/2, prev_node/1, status/2.
 
 different(X, X) :- !, fail.
 different(X, Y).
@@ -24,8 +24,54 @@ The players equipment.
 equipped(weapon_slot, nothing).
 equipped(armor_slot, nothing).
 equipped(head_slot, nothing).
+equipped(magic_slot, nothing).
+
+/*
+stats for characters
+*/
+health(slime, 20).
+health(player, 100).
+defense(slime, 1).
+defense(player, 1).
+attack(slime, 1).
+attack(player, 1).
+magic_attack(slime, 1).
+magic_attack(player, 1).
+magic_defense(slime, 1).
+magic_defense(player, 1).
+
+status(slime, alive).
+status(player, alive).
+
+deal_damage(X, Y) :- attack(X, AM), defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)),assert(health(Y, R)) ,
+ nl, write(Y),write(" has "),write(R),write(" health left after the attack from "),write(X).
+
+deal_magic_damage(X, Y) :- magic_attack(X, AM), magic_defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)),assert(health(Y, R)) ,
+ nl, write(Y),write(" has "),write(R),write(" health left after the magic attack from "),write(X).
+
+calc_damage(AM, DM, H, R):-
+R is H - (10 * AM / DM).
+
+attack(Y):- deal_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(slime).
+magic_attack(Y):- deal_magic_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(slime).
+
+check_dead(player):-  health(player, H), H < 1 , status(player, S), assert(status(player, dead)), retract(status(player, S)),
+nl, write("you are dead. rip you suck. Game Halting"), halt(0).
+check_dead(X):- different(X, player), health(X, H), H < 1 , status(X, S), assert(status(X, dead)), retract(status(X, S)),
+nl, write(X), write(" is dead. you are safe to travel again"), nl, current_node_is(N), prev_node(PN),
+ assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)).
+ check_dead(_).
 
 
+
+event(slime_field):-
+ current_node_is(PN), assert(prev_node(PN)), status(slime, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
+ describe_battle(player, slime). 
+event(_).
+
+describe_battle(X, Y):- health(X, H1), health(Y, H2), nl, write("you have "), write(H1)
+, write("health remaining."), nl, write(Y), write(" has "), write(H2), write("health remaining."), nl,
+write("your options are attack("), write(Y), write(") and magic_attack("), write(Y), write(")"), nl.
 /*
 edge(Start, Direction, Destination)
 Represents an edge from the current node, travelling in the given direction and reaching the specified end node. 
@@ -44,6 +90,8 @@ edge(maze, south, crossroads).
 edge(abandoned_house, west, crossroads).
 
 edge(armory, east, crossroads).
+edge(armory, south, slime_field).
+edge(slime_field, north, armory).
 
 /*
 Initialize the location of the many items in the game.
@@ -52,7 +100,7 @@ Initialize the location of the many items in the game.
 located(sword, abandoned_house).
 located(armor, armory).
 located(crown, boss).
-
+located(spellbook, tower).
 /*
 Initialize the enemies in the game. Not used in the demo (used demo as proxy for determining whether or not boss is alive or dead).
 */
@@ -62,7 +110,7 @@ is_alive(boss).
 /*
 Handles movement from node to node.
 */
-move(D) :- current_node_is(S), edge(S, D, E), assert(current_node_is(E)), retract(current_node_is(S)), scene, nl, !.
+move(D) :- current_node_is(S), edge(S, D, E), assert(current_node_is(E)), retract(current_node_is(S)), scene, event(E), nl, !.
 move(_) :- write("Unable to move in that direction!"), nl, !, fail.
 
 % Directions
@@ -136,6 +184,10 @@ description(maze) :-
     assert(equipped(head_slot, crown)),
     retract(equipped(head_slot, nothing)).
 
+description(slime_field) :-
+    nl,
+    write("Oh no you arrived at the slime field. These things are very aggressive and "), nl,
+    write("will kill you if you let them. oh no one just attacked, hope your ready! "), nl.
 description(armory) :-
     equipped(armor_slot, armor),
     nl,
