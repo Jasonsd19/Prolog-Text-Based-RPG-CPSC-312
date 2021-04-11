@@ -1,5 +1,5 @@
-:- dynamic current_node_is/1, equipped/2, located/2, health/2, defense/2, attack/2, magic/2, prev_node/1, status/2
-, king_status/2, gold/1.
+:- dynamic current_node_is/1, equipped/2, located/2, health/2, defense/2, attack/2, magic_attack/2, magic_defense/2, prev_node/1, status/2,
+    king_status/2, gold/1.
 
 different(X, X) :- !, fail.
 different(X, Y).
@@ -79,9 +79,9 @@ status(skeleton, alive).
 damage calculations
 */
 deal_damage(X, Y) :- attack(X, AM), defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)),assert(health(Y, R)) ,
- nl, write(Y),write(" has "),write(R),write(" health left after the attack from "),write(X).
+ nl, format("~w has ~2f health after the attack from ~w", [Y, R, X]), nl, !.
 deal_magic_damage(X, Y) :- magic_attack(X, AM), magic_defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)),assert(health(Y, R)) ,
- nl, write(Y),write(" has "),write(R),write(" health left after the magic attack from "),write(X).
+ nl, format("~w has ~2f health after the magic attack from ~w", [Y, R, X]), nl, !.
 
 calc_damage(AM, DM, H, R):-
 R is H - (10 * AM / DM).
@@ -89,50 +89,51 @@ R is H - (10 * AM / DM).
 /*
 battle functions
 */
-attack(Y):- deal_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(slime).
-magic_attack(Y):- deal_magic_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(slime).
+attack(Y):- deal_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(Y).
+magic_attack(Y):- deal_magic_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(Y).
 
 check_dead(player):-  health(player, H), H < 1 , status(player, S), assert(status(player, dead)), retract(status(player, S)),
-nl, write("You are dead. Game Over."), halt(0).
+nl, write("You are dead. Game Over. Press '.' to exit."), nl, read(_), halt(0).
 
 check_dead(X):- different(X, player), different(X, king), health(X, H), H < 1 , status(X, S), assert(status(X, dead)), retract(status(X, S)),
 nl, write(X), write(" is dead. You are safe to travel again."), nl, current_node_is(N), prev_node(PN),
- assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)).
-check_dead(_).
+assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)), !.
+check_dead(_) :- !.
 
 check_dead(X):- assert(X, king), health(X, H), H < 1, status(X, S), assert(status(X, dead)), retract(status(X, S)),
  nl, write("The king is finally dead. Now go home and restore balance to your homeland!"), nl, current_node_is(N), prev_node(PN), % Aiden
- assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)).
+ assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)), !.
 
 /*
 events for each location.
 */
 event(slime_field):-
  current_node_is(PN), assert(prev_node(PN)), status(slime, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
- write("You are attacked by a slime!"), describe_battle(player, slime). 
+ write("You are attacked by a slime!"), describe_battle(player, slime), !. 
 
 event(cemetery2):-
  current_node_is(PN), assert(prev_node(PN)), status(ghost, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
- write("As you come upon a particular gravestone, a ghost emerges from the fog and attacks you!"), describe_battle(player, ghost).
+ write("As you come upon a particular gravestone, a ghost emerges from the fog and attacks you!"), describe_battle(player, ghost), !.
 
 event(river) :-
  current_node_is(PN), assert(prev_node(PN)), status(troll, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
- write("You come to a bridge that spans the river, but a troll jumps out to block your way!"), describe_battle(player, troll).
+ write("You come to a bridge that spans the river, but a troll jumps out to block your way!"), describe_battle(player, troll), !.
 
 event(tower) :-
  current_node_is(PN), assert(prev_node(PN)), status(skeleton, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
- write("After climbing the spiral staircase to the top of the tower, the skeletal remains of an ancient wizard attacks you!"), describe_battle(player, skeleon). 
+ write("After climbing the spiral staircase to the top of the tower, the skeletal remains of an ancient wizard attacks you!"), describe_battle(player, skeleton), !. 
 
 event(boss):-
  current_node_is(PN), assert(prev_node(PN)), status(king, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
  write("You enter the throne room; the evil king is waiting with his broadsword at the ready. He is large and cunning, you will need all your strength to defeat him."), nl,
- write("You lunge forward to engage the evil king in battle!"), nl, describe_battle(player, king).
+ write("You lunge forward to engage the evil king in battle!"), nl, describe_battle(player, king), !.
 
-event(_).
+event(_) :- !.
 
-describe_battle(X, Y):- health(X, H1), health(Y, H2), nl, write("you have "), write(H1),
-    write("health remaining."), nl, write(Y), write(" has "), write(H2), write("health remaining."), nl,
-    write("your options are attack("), write(Y), write(") and magic_attack("), write(Y), write(")"), nl.
+describe_battle(X, Y):- health(X, H1), health(Y, H2), nl, 
+    format("You have ~0f health remaining.", [H1]), nl,
+    format("~w has ~0f health remaining.", [Y, H2]), nl,
+    write("your options are attack("), write(Y), write(") and magic_attack("), write(Y), write(")"), nl, !.
 /*
 edge(Start, Direction, Destination)
 Represents an edge from the current node, travelling in the given direction and reaching the specified end node. 
@@ -144,7 +145,7 @@ edge(castle, south, home) :- equipped(head_slot, crown). % fast travel for end o
 
 edge(crossroads, north, forest) :- equipped(weapon_slot, short_sword), equipped(armor_slot, chainmail).
 edge(crossroads, north, forest) :- equipped(weapon_slot, halberd), equipped(armor_slot, chainmail).
-edge(crossroads, north, forest) :- write("It would be suicide to enter the forest without armor and weapons!"), nl, fail.
+edge(crossroads, north, forest) :- write("It would be suicide to enter the forest without armor and weapons!"), nl, !, fail.
 edge(crossroads, west, abandoned_house).
 edge(crossroads, east, armory).
 
@@ -170,6 +171,8 @@ edge(armory, west, crossroads).
 edge(armory, south, slime_field).
 edge(slime_field, north, armory).
 
+edge(slime_field, east, cave) :- located(halberd, weapon_slot), write("It would mean sure death to go back into that cave."), nl, !, fail.
+edge(slime_field, east, cave) :- located(halberd, narnia), write("It would mean sure death to go back into that cave."), nl, !, fail.
 edge(slime_field, east, cave).
 edge(cave, west, slime_field).
 
@@ -207,10 +210,14 @@ item(breastplate, armor_slot, defense(player, 7)).
 item(fire_wand, magic_slot, magic_attack(player, 7)).
 item(health_potion, potion, 1).
 
+item(nothing, weapon_slot, attack(player, 1)).
+item(nothing, armor_slot, defense(player, 1)).
+item(nothing, magic_slot, magic_attack(player, 1)).
+
 /*
 Handles movement from node to node.
 */
-move(D) :- current_node_is(S), edge(S, D, E), assert(current_node_is(E)), retract(current_node_is(S)), event(E), scene(E), nl, !.
+move(D) :- current_node_is(S), edge(S, D, E), retract(current_node_is(S)), assert(current_node_is(E)), scene(E), event(E), nl, !.
 move(_) :- write("Unable to move in that direction!"), nl, !, fail.
 
 % Directions
@@ -223,19 +230,38 @@ w :- move(west).
 %r :- move(east).
 %f :- move(north).
 
-drink_health_potion:- current_node_is(X), different(battle_dimension, X), potion_count(health_potion, C), C > 0, heal(30).
+drink_health_potion:- current_node_is(X), different(battle_dimension, X), potion_count(health_potion, C), C > 0, heal(30), !.
 
 /*
 Handles picking up items.
 */
-take(chest) :- assert(gold(50)), retract(gold(0)).
+take(chest) :- assert(gold(50)), retract(gold(0)), assert(located(halberd, narnia)), retract(located(halberd, cave)), !.
+take(I1) :-
+    located(I1, shop), current_node_is(shop), item(I1, Y, S), equipped(Y, I2), different(item(I1, Y, S), item(_,potion,_)),
+    buy(I1),
+    assert(located(I1, Y)), assert(equipped(Y, I1)), retract(located(I1, X)), retract(equipped(Y, I2)), item_event(I1, S)
+    , nl, !.
 take(I1) :- 
-    located(I1, X), current_node_is(X), item(I1, Y, S), equipped(Y, I2), different(item(I1, Y, S), item(_,potion,_)),
+    located(I1, X), current_node_is(X), item(I1, Y, S), equipped(Y, I2), different(X, shop), different(item(I1, Y, S), item(_,potion,_)),
     assert(located(I1, Y)), assert(equipped(Y, I1)), retract(located(I1, X)), retract(equipped(Y, I2)), item_event(I1, S)
     , nl, !.
 take(I1):- located(I1, X), current_node_is(X), item(I1, potion, S), add_potion(I1), retract(located(I1, X)), !.
-take(_) :- write("No such item here."), !.
+take(_) :- write("Unable to acquire that item."), !.
 
+/*
+Item purchasing.
+*/
+buy(broadsword) :- gold(X), X > 19, Y is X - 20, assert(gold(Y)), retract(gold(X)).
+buy(broadsword) :- write("You don't have enough gold!"), nl, fail.
+
+buy(battle_axe) :- gold(X), X > 19, Y is X - 20, assert(gold(Y)), retract(gold(X)).
+buy(battle_axe) :- write("You don't have enough gold!"), nl, fail.
+
+buy(breastplate) :- gold(X), X > 29, Y is X - 30, assert(gold(Y)), retract(gold(X)).
+buy(breastplate) :- write("You don't have enough gold!"), nl, fail.
+
+buy(fire_wand) :- gold(X), X > 49, Y is X - 50, assert(gold(Y)), retract(gold(X)).
+buy(fire_wand) :- write("You don't have enough gold!"), nl, fail.
 
 /*
 item events
@@ -244,25 +270,40 @@ item events
 item_event(I, S):- functor(S, F, N), OldStat =.. [F, player, B] , assert(S), retract(OldStat),
  nl, format("Item Aqquired: ~w", [I]), nl
 , format("Old stat: ~w", [OldStat]), nl ,
- format("new stat: ~w", [S]).
+ format("new stat: ~w", [S]), !.
 
-item_event(_, _).
+item_event(_, _) :- !.
 
 add_potion(I):- item(I, potion, N), potion_count(I, C), NC is C + N, assert(potion_count(I, NC)), retract(potion_count(I, C)), nl
-, write(I), format(" count increased to : ~w", [NC]).  
+, write(I), format(" count increased to : ~w", [NC]), !.
 
 /*
 Describes the players gear.
 */
 
-inspect :-
+inspect(player) :-
     nl,
+    gold(G),
     equipped(head_slot, X),
     equipped(weapon_slot, Y),
     equipped(armor_slot, Z),
+    equipped(magic_slot, M),
+    health(player, H),
+    defense(player, D),
+    attack(player, A),
+    magic_attack(player, MA),
+    magic_defense(player, MD),
     format("Head slot: ~w", [X]), nl,
-    format("Armor slot: ~w", [Y]), nl,
-    format("Weapon slot: ~w", [Z]), nl, !.
+    format("Armor slot: ~w", [Z]), nl,
+    format("Weapon slot: ~w", [Y]), nl,
+    format("Magic slot: ~w", [M]), nl,
+    format("You currently have ~2f HP, ~w Attack, ~w Defence, ~w Magic Attack and ~w Magic Defence.", [H, A, D, MA, MD]), nl,
+    format("You are carrying ~w gold coins.", [G]), nl, !.
+inspect(I1) :-
+    located(I1, X), current_node_is(X), item(I1, Y, S1), equipped(Y, I2), item(I2, Y, S2), different(item(I1, Y, S), item(_,potion,_)),
+    format("The item in your ~w has a value of ~w", [Y, S2]), nl,
+    format("The item you see has a value of ~w", [S1]), nl, !.
+inspect(_) :- write("You can't inspect that!"), nl, !.
 
 
 /*
@@ -270,6 +311,8 @@ Describes the current location to the player
 */
 
 scene(X) :- current_node_is(X), description(X).
+
+look :- current_node_is(X), description(X), !.
 
 description(home) :-
     equipped(head_slot, crown),
@@ -323,7 +366,7 @@ description(cave) :-
     write("You enter the cave, it is dark but you can see enough to spot two valuable items on the ground."), nl,
     write("A treasure chest and a steel [halberd] lie on opposite sides of the cave's mouth."), nl,
     write("But you hear a deep roar echo from the depths of the cave, there is only time to take one item."), nl,
-    write("Enter 'take(chest).' or 'take(halberd).' and then run to the west!"), nl. % Honour system lol
+    write("Enter 'take(chest).' or 'take(halberd).' and then run to the west!"), nl. % Fixed
 
 
 % West of Crossroads
@@ -426,7 +469,7 @@ description(boss) :-
 Starts the game.
 */
 
-play :- tutorial, assert(current_node_is(home)), description(home).
+play :- tutorial, description(home).
 
 /*
 Basic instructions for players
@@ -438,6 +481,8 @@ tutorial :-
     write("You will recieve a short description of each location when you arrive there, pay attention to what's presented."), nl,
     write("You can move in four directions. North (n), East (e), South (s), and West (w). To move simply type the shorthand for a direction followed by a period."), nl,
     write("For example typing 'n.' would move you North."), nl,
+    write("Once you reach a new location a short description of what you observe will be given."), nl,
+    write("If you miss this description simply type 'look.' to have it be shown again."), nl,
     write("To pick up or equip an item type 'take(itemName)' where itemName can be any object the game describes such as a sword or armor."), nl,
-    write("To inspect your current equipment type 'inspect.'"), nl,
-    write("That's all for now. Enjoy the game!"), nl.
+    write("To inspect your current equipment type 'inspect(player).', to compare items type 'inspect(itemName).'"), nl,
+    write("That's all for now. Enjoy the game!"), nl, !.
