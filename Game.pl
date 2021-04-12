@@ -50,20 +50,20 @@ defense(skeleton, 4).
 attack(slime, 1).
 attack(ghost, 0).
 attack(player, 1).
-attack(king, 10).
+attack(king, 7).
 attack(troll, 3).
 attack(skeleton, 1).
 
 magic_attack(slime, 1).
 magic_attack(ghost, 2).
 magic_attack(player, 1).
-magic_attack(king, 7).
+magic_attack(king, 5).
 magic_attack(troll, 0).
 magic_attack(skeleton, 4).
 
 magic_defense(slime, 1).
 magic_defense(ghost, 1).
-magic_defense(player, 1).
+magic_defense(player, 4).
 magic_defense(king, 5).
 magic_defense(troll, 1).
 magic_defense(skeleton, 4).
@@ -83,22 +83,35 @@ deal_damage(X, Y) :- attack(X, AM), defense(Y, DM), health(Y, H), status(Y, aliv
 deal_magic_damage(X, Y) :- magic_attack(X, AM), magic_defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)),assert(health(Y, R)) ,
  nl, format("~w has ~2f health after the magic attack from ~w", [Y, R, X]), nl, !.
 
+ deal_damage_monster(X, Y) :- attack(X, AM), defense(Y, DM), magic_attack(X, MAM), magic_defense(Y, MDM), health(Y, H), status(Y, alive), calc_damage_physical(AM, DM, H, R1), calc_damage_magical(MAM, MDM, H, R2),
+  R1 < R2, retract(health(Y, H)),assert(health(Y, R1)) , nl, 
+  format("~w has ~2f health after the physical attack from ~w", [Y, R1, X]), nl, !.
+ deal_damage_monster(X, Y) :- attack(X, AM), defense(Y, DM), magic_attack(X, MAM), magic_defense(Y, MDM), health(Y, H), status(Y, alive), calc_damage_physical(AM, DM, H, R1), calc_damage_magical(MAM, MDM, H, R2),
+  R1 > R2, retract(health(Y, H)),assert(health(Y, R2)) , nl, 
+  format("~w has ~2f health after the magical attack from ~w", [Y, R2, X]), nl, !.
+
 calc_damage(AM, DM, H, R):-
-R is H - (10 * AM / DM).
+ R is H - (10 * AM / DM).
+
+calc_damage_physical(AM, DM, H, R):-
+ R is H - (10 * AM / DM).
+
+calc_damage_magical(MAM, MDM, H, R):-
+ R is H - (10 * MAM / MDM).
 
 /*
 battle functions
 */
-attack(Y):- deal_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(Y).
-magic_attack(Y):- deal_magic_damage(player,Y), deal_damage(Y, player), check_dead(player), check_dead(Y).
+attack(Y):- deal_damage(player,Y), deal_damage_monster(Y, player), check_dead(player), check_dead(Y).
+magic_attack(Y):- deal_magic_damage(player,Y), deal_damage_monster(Y, player), check_dead(player), check_dead(Y).
 
 check_dead(player):-  health(player, H), H < 1 , status(player, S), assert(status(player, dead)), retract(status(player, S)),
-nl, write("You are dead. Game Over. Press '.' to exit."), nl, read(_), halt(0).
+ nl, write("You are dead. Game Over."), nl, halt(1).
 
 check_dead(X):- different(X, player), different(X, king), health(X, H), H < 1 , status(X, S), assert(status(X, dead)), retract(status(X, S)),
-nl, write(X), write(" is dead. You are safe to travel again."), nl, current_node_is(N), prev_node(PN),
-assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)), !.
-check_dead(_) :- !.
+ nl, write(X), write(" is dead. You are safe to travel again."), nl, current_node_is(N), prev_node(PN),
+ assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)), !.
+ check_dead(_) :- !.
 
 check_dead(X):- assert(X, king), health(X, H), H < 1, status(X, S), assert(status(X, dead)), retract(status(X, S)),
  nl, write("The king is finally dead. Now go home and restore balance to your homeland!"), nl, current_node_is(N), prev_node(PN), % Aiden
@@ -108,23 +121,23 @@ check_dead(X):- assert(X, king), health(X, H), H < 1, status(X, S), assert(statu
 events for each location.
 */
 event(slime_field):-
- current_node_is(PN), assert(prev_node(PN)), status(slime, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
+ current_node_is(PN), status(slime, alive), assert(prev_node(PN)), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
  write("You are attacked by a slime!"), describe_battle(player, slime), !. 
 
 event(cemetery2):-
- current_node_is(PN), assert(prev_node(PN)), status(ghost, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
+ current_node_is(PN), status(ghost, alive), assert(prev_node(PN)), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
  write("As you come upon a particular gravestone, a ghost emerges from the fog and attacks you!"), describe_battle(player, ghost), !.
 
 event(river) :-
- current_node_is(PN), assert(prev_node(PN)), status(troll, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
+ current_node_is(PN), status(troll, alive), assert(prev_node(PN)), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
  write("You come to a bridge that spans the river, but a troll jumps out to block your way!"), describe_battle(player, troll), !.
 
 event(tower) :-
- current_node_is(PN), assert(prev_node(PN)), status(skeleton, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
+ current_node_is(PN), status(skeleton, alive), assert(prev_node(PN)), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
  write("After climbing the spiral staircase to the top of the tower, the skeletal remains of an ancient wizard attacks you!"), describe_battle(player, skeleton), !. 
 
 event(boss):-
- current_node_is(PN), assert(prev_node(PN)), status(king, alive), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
+ current_node_is(PN), status(king, alive), assert(prev_node(PN)), different(battle_dimension, PN), assert(current_node_is(battle_dimension)), retract(current_node_is(PN)),
  write("You enter the throne room; the evil king is waiting with his broadsword at the ready. He is large and cunning, you will need all your strength to defeat him."), nl,
  write("You lunge forward to engage the evil king in battle!"), nl, describe_battle(player, king), !.
 
@@ -318,9 +331,8 @@ description(home) :-
     equipped(head_slot, crown),
     nl,
     write("At last, you are home again. With the crown on your head, you raise your hands and new life spreads outward to all the land."), nl,
-    write("You win! Thanks for playing! Press '.' to exit."), nl,
-    read(_),
-    halt(0).
+    write("You win! Thanks for playing!"), nl,
+    halt(1).
 description(home) :-
     nl,
     write("You look around at the chaos the evil king has brought to your homeland."), nl,
@@ -437,12 +449,12 @@ description(castle) :-
     located(spellbook, tower),
     nl,
     write("The castle door is locked, but you find a side entrance to sneak into. You can continue forward to the throne room or take a right and look around in the wizard's tower."), nl,
-    write("Enter 'f.' to continue forward to thr throne room, or enter 'r.' to turn right and search the wizard's tower."), nl.
+    write("Enter 'n.' to continue forward to the throne room, or enter 'e.' to turn right and search the wizard's tower."), nl.
 description(castle) :-
     %equipped(magic_slot, spellbook),
     nl,
     write("Your final battle is ahead of you. The evil king resides in the throne room just ahead. Steel your resolve and prepare to fight!"), nl,
-    write("Enter 'f.' to go forward and face your enemy."), nl.
+    write("Enter 'w.' to go back to the castle and face your enemy."), nl.
 
 description(tower) :-
     located(spellbook, tower),
