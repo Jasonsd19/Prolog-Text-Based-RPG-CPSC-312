@@ -13,6 +13,7 @@ load_default_equipment :-
     assert(equipped(armor_slot, nothing)),
     assert(equipped(head_slot, nothing)),
     assert(equipped(magic_slot, nothing)),
+    assert(equipped(cape_slot, nothing)),
     assert(potion_count(health_potion, 0)),
     assert(gold(0)).
 
@@ -27,19 +28,19 @@ load_default_player_stats :-
     assert(defense(player, 1)),
     assert(attack(player, 1)),
     assert(magic_attack(player, 1)),
-    assert(magic_defense(player, 4)).
+    assert(magic_defense(player, 1)).
 
-king_status(player, no).
-health(slime, 10).
-health(ghost, 10).
+%king_status(player, no).
+health(slime, 15).
+health(ghost, 15).
 health(king, 50).
-health(troll, 20).
-health(skeleton, 5).
+health(troll, 25).
+health(skeleton, 20).
 
 defense(slime, 1).
 defense(ghost, 100).
 defense(king, 5).
-defense(troll, 2).
+defense(troll, 3).
 defense(skeleton, 4).
 
 attack(slime, 1).
@@ -57,7 +58,7 @@ magic_attack(skeleton, 4).
 magic_defense(slime, 1).
 magic_defense(ghost, 1).
 magic_defense(king, 5).
-magic_defense(troll, 1).
+magic_defense(troll, 2).
 magic_defense(skeleton, 4).
 
 load_default_status :-
@@ -71,16 +72,19 @@ load_default_status :-
 /*
 damage calculations
 */
-deal_damage(X, Y) :- attack(X, AM), defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)),assert(health(Y, R)) ,
+deal_damage(X, Y) :- attack(X, AM), defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)), assert(health(Y, R)),
  nl, format("~w has ~2f health after the attack from ~w", [Y, R, X]), nl, !.
-deal_magic_damage(X, Y) :- magic_attack(X, AM), magic_defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)),assert(health(Y, R)) ,
+deal_magic_damage(X, Y) :- magic_attack(X, AM), magic_defense(Y, DM), health(Y, H), status(Y, alive), calc_damage(AM, DM, H, R), retract(health(Y, H)), assert(health(Y, R)),
  nl, format("~w has ~2f health after the magic attack from ~w", [Y, R, X]), nl, !.
 
- deal_damage_monster(X, Y) :- attack(X, AM), defense(Y, DM), magic_attack(X, MAM), magic_defense(Y, MDM), health(Y, H), status(Y, alive), calc_damage_physical(AM, DM, H, R1), calc_damage_magical(MAM, MDM, H, R2),
+deal_damage_monster(X, Y) :- attack(X, AM), defense(Y, DM), magic_attack(X, MAM), magic_defense(Y, MDM), health(Y, H), status(Y, alive), calc_damage_physical(AM, DM, H, R1), calc_damage_magical(MAM, MDM, H, R2),
   R1 < R2, retract(health(Y, H)),assert(health(Y, R1)) , nl, 
   format("~w has ~2f health after the physical attack from ~w", [Y, R1, X]), nl, !.
- deal_damage_monster(X, Y) :- attack(X, AM), defense(Y, DM), magic_attack(X, MAM), magic_defense(Y, MDM), health(Y, H), status(Y, alive), calc_damage_physical(AM, DM, H, R1), calc_damage_magical(MAM, MDM, H, R2),
+deal_damage_monster(X, Y) :- attack(X, AM), defense(Y, DM), magic_attack(X, MAM), magic_defense(Y, MDM), health(Y, H), status(Y, alive), calc_damage_physical(AM, DM, H, R1), calc_damage_magical(MAM, MDM, H, R2),
   R1 > R2, retract(health(Y, H)),assert(health(Y, R2)) , nl, 
+  format("~w has ~2f health after the magical attack from ~w", [Y, R2, X]), nl, !.
+deal_damage_monster(X, Y) :- attack(X, AM), defense(Y, DM), magic_attack(X, MAM), magic_defense(Y, MDM), health(Y, H), status(Y, alive), calc_damage_physical(AM, DM, H, R1), calc_damage_magical(MAM, MDM, H, R2),
+  R1 = R2, retract(health(Y, H)),assert(health(Y, R2)) , nl, 
   format("~w has ~2f health after the magical attack from ~w", [Y, R2, X]), nl, !.
 
 calc_damage(AM, DM, H, R):-
@@ -95,7 +99,7 @@ calc_damage_magical(MAM, MDM, H, R):-
 /*
 battle functions
 */
-attack(Y):- deal_damage(player,Y), deal_damage_monster(Y, player), check_dead(player), check_dead(Y).
+attack(Y):- deal_damage(player,Y), write("Player attacked!"), nl, deal_damage_monster(Y, player), write("Monster attacked!"), nl, check_dead(player), check_dead(Y).
 magic_attack(Y):- deal_magic_damage(player,Y), deal_damage_monster(Y, player), check_dead(player), check_dead(Y).
 
 check_dead(player):-  health(player, H), H < 1 , status(player, S), assert(status(player, dead)), retract(status(player, S)),
@@ -104,13 +108,18 @@ check_dead(player):-  health(player, H), H < 1 , status(player, S), assert(statu
 check_dead(X):- different(X, player), different(X, king), health(X, H), H < 1 , status(X, S), assert(status(X, dead)), retract(status(X, S)),
  nl, write(X), write(" is dead. You are safe to travel again."), nl, current_node_is(N), prev_node(PN), dead_event(X),
  assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)), !.
- check_dead(_) :- !.
 
-check_dead(X):- assert(X, king), health(X, H), H < 1, status(X, S), assert(status(X, dead)), retract(status(X, S)),
- nl, write("The king is finally dead. Now go home and restore balance to your homeland!"), nl, current_node_is(N), prev_node(PN), % Aiden
- assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)), !.
+check_dead(X):- different(X, player), health(X, H), H < 1, status(X, S), assert(status(X, dead)), retract(status(X, S)), current_node_is(N), prev_node(PN),
+ assert(current_node_is(PN)), retract(current_node_is(N)), retract(prev_node(PN)), scene(PN),
+ nl, write("The king is finally dead. Now go home and restore balance to your homeland!"), nl, !.
+
+check_dead(_) :- !.
 
 dead_event(slime):- add_potion(health_potion), add_gold(10).
+
+dead_event(ghost):- add_gold(10).
+
+dead_event(troll):- add_potion(health_potion), add_gold(20).
 dead_event(_).
 
 battle(X):- current_node_is(PN), status(X, alive), assert(prev_node(PN)), different(battle_dimension, PN),
@@ -125,17 +134,17 @@ events for each location.
 */
 
 event(slime_field):- 
-status(slime, alive), write("You are attacked by a slime!"), battle(slime), !. 
+status(slime, alive), write("You are attacked by a slime!"), nl, sleep(2), nl, battle(slime), !. 
 
 event(river) :-
-status(troll, alive), write("You come to a bridge that spans the river, but a troll jumps out to block your way!"), battle(troll), !.
+status(troll, alive), write("You come to a bridge that spans the river, but a troll jumps out to block your way!"), nl, sleep(2), nl, battle(troll), !.
 
 event(tower) :-
-status(skeletan, alive), write("After climbing the spiral staircase to the top of the tower, the skeletal remains of an ancient wizard attacks you!"), battle(skeleton), !. 
+status(skeleton, alive), write("After climbing the spiral staircase to the top of the tower, the skeletal remains of an ancient wizard attacks you!"), nl, sleep(2), nl, battle(skeleton), !.
 
 event(boss):-
 status(king, alive), write("You enter the throne room; the evil king is waiting with his broadsword at the ready. He is large and cunning, you will need all your strength to defeat him."), nl,
- write("You lunge forward to engage the evil king in battle!"), nl, battle(king), !.
+sleep(2), nl, write("You lunge forward to engage the evil king in battle!"), nl, battle(king), !.
 
 event(_) :- !.
 
@@ -162,6 +171,7 @@ edge(forest, west, shop).
 edge(shop, east, forest).
 
 edge(river, north, castle).
+edge(river, south, forest).
 edge(castle, south, river).
 edge(castle, north, boss).
 edge(boss, south, castle).
@@ -198,12 +208,15 @@ load_default_locations :-
     assert(located(halberd, cave)),
     assert(located(crown, boss)),
     assert(located(spellbook, tower)),
+    assert(located(pristine_cloak, tower)),
     assert(located(frost_wand, cemetery)),
+    assert(located(rugged_cloak, cemetery)),
     assert(located(magic_staff, forest)),
     assert(located(broadsword, shop)),
     assert(located(battle_axe, shop)),
     assert(located(breastplate, shop)),
-    assert(located(fire_wand, shop)).
+    assert(located(fire_wand, shop)),
+    assert(located(quality_cloak, shop)).
 
 % add health potions to shop or somewhere else
 
@@ -221,14 +234,18 @@ item(magic_staff, magic_slot, magic_attack(player, 5)).
 item(broadsword, weapon_slot, attack(player, 10)).
 item(breastplate, armor_slot, defense(player, 7)).
 item(fire_wand, magic_slot, magic_attack(player, 7)).
+item(rugged_cloak, cape_slot, magic_defense(player, 2)).
+item(quality_cloak, cape_slot, magic_defense(player, 4)).
+item(pristine_cloak, cape_slot, magic_defense(player, 5)).
 item(health_potion, potion, 1).
 
 item(nothing, weapon_slot, attack(player, 1)).
 item(nothing, armor_slot, defense(player, 1)).
 item(nothing, magic_slot, magic_attack(player, 1)).
+item(nothing, cape_slot, magic_defense(player, 1)).
 
 search :- current_node_is(X), nl, format("searching ~w for items. ", [X]).
-search :- current_node_is(X), located(I, X), nl, format("~w", [X]).
+search :- current_node_is(X), located(I, X), nl, format("~w", [I]).
 search :- current_node_is(X), nl, write("found everything useful").
 /*
 Handles movement from node to node.
@@ -246,7 +263,19 @@ w :- move(west).
 %r :- move(east).
 %f :- move(north).
 
-drink_health_potion:- current_node_is(X), different(battle_dimension, X), potion_count(health_potion, C), C > 0, heal(30), !.
+drink_health_potion:- 
+    current_node_is(X), different(battle_dimension, X), potion_count(health_potion, C), C > 0, heal(30), Y is C - 1, 
+    retract(potion_count(health_potion, C)), assert(potion_count(health_potion, Y)), !.
+drink_health_potion:-
+    current_node_is(battle_dimension), nl,
+    write("Can't drink potions during combat!"), nl, !.
+
+heal(X) :- 
+    health(player, Y), Z is X + Y, Z < 51, retract(health(player, Y)), assert(health(player, Z)), nl,
+    format("Your health points have increased from ~w to ~w!", [Y, Z]), nl, !.
+heal(X) :- 
+    health(player, Y), Z is X + Y, Z > 50, retract(health(player, Y)), assert(health(player, 50)), nl,
+    format("Your health points have increased from ~w to 50!", [Y]), nl, !.
 /*
 Initialize the iteractables of the game.
 */
@@ -295,6 +324,9 @@ buy(breastplate) :- write("You don't have enough gold!"), nl, fail.
 buy(fire_wand) :- gold(X), X > 49, Y is X - 50, assert(gold(Y)), retract(gold(X)).
 buy(fire_wand) :- write("You don't have enough gold!"), nl, fail.
 
+buy(quality_cloak) :- gold(X), X > 29, Y is X - 30, assert(gold(Y)), retract(gold(X)).
+buy(quality_cloak) :- write("You don't have enough gold!"), nl, fail.
+
 /*
 item events
 */
@@ -321,6 +353,7 @@ inspect(player) :-
     equipped(weapon_slot, Y),
     equipped(armor_slot, Z),
     equipped(magic_slot, M),
+    equipped(cape_slot, C),
     health(player, H),
     defense(player, D),
     attack(player, A),
@@ -328,10 +361,17 @@ inspect(player) :-
     magic_defense(player, MD),
     format("Head slot: ~w", [X]), nl,
     format("Armor slot: ~w", [Z]), nl,
+    format("Cape slot: ~w", [C]), nl,
     format("Weapon slot: ~w", [Y]), nl,
     format("Magic slot: ~w", [M]), nl,
     format("You currently have ~2f HP, ~w Attack, ~w Defence, ~w Magic Attack and ~w Magic Defence.", [H, A, D, MA, MD]), nl,
-    format("You are carrying ~w gold coins and ~w health potions.", [G, P]), nl, !.
+    format("You are carrying ~w gold coins and ~w health potion(s).", [G, P]), nl, !.
+inspect(health_potion) :-
+    potion_count(I, C),
+    C > 0,
+    nl,
+    write("A bright red health potion, it will heal a large amount of health. To use type 'drink_health_potion.'"),
+    nl, !.
 inspect(I1) :-
     located(I1, X), current_node_is(X), item(I1, Y, S1), equipped(Y, I2), item(I2, Y, S2), different(item(I1, Y, S), item(_,potion,_)),
     format("The item in your ~w has a value of ~w", [Y, S2]), nl,
@@ -447,13 +487,16 @@ description(shop) :-
     located(battle_axe, shop),
     located(broadsword, shop),
     located(breastplate, shop),
+    located(quality_cloak, shop),
     write("You find a goblin selling his wares in the middle of a small clearing."), nl,
-    write("For sale is a [broadsword] for 20 gold, a [battle_axe] for 20 gold, a [breastplate] for 30 gold, and a [fire_wand] for 50 gold."), nl,
+    write("For sale is a [broadsword] for 20 gold, a [battle_axe] for 20 gold, a [breastplate] for 30 gold, a [fire_wand] for 50 gold, and a [quality_cloak] for 30 gold"), nl,
     write("Enter 'take(___)' for any items you'd like to buy."), nl, % implement shop system?
     write("The only exit is back east to the forest."), nl.
 description(shop) :-
     write("The goblin is nowhere to be seen, so the only thing to do is go back east."), nl.
 
+description(river) :-
+    status(troll, alive).
 description(river) :-
     nl,
     write("With the troll vanquished, you can continue north across the bridge to reach the evil king's castle, which looms large in the distance."), nl.
@@ -472,28 +515,33 @@ description(castle) :-
     %equipped(magic_slot, spellbook),
     nl,
     write("Your final battle is ahead of you. The evil king resides in the throne room just ahead. Steel your resolve and prepare to fight!"), nl,
-    write("Enter 'w.' to go back to the castle and face your enemy."), nl.
+    write("Enter 'n.' to go back to the castle and face your enemy."), nl.
 
+description(tower) :-
+    located(spellbook, tower),
+    status(skeleton, alive).
 description(tower) :-
     located(spellbook, tower),
     nl,
     write("The scattered bones reveal the skeleton's magical arsenal: a wizard's [spellbook]."), nl,
     write("Enter 'take(spellbook)' to equip the magical book."), nl,
-    write("Enter 'l.' to leave the tower and return to the main castle grounds.").
+    write("Enter 'w.' to leave the tower and return to the main castle grounds."), nl.
 description(tower) :-
     %equipped(magic_slot, spellbook),
     nl,
     write("There is nothing left here but old vials and tattered robes."), nl,
-    write("Enter 'l.' to leave the tower and return to the main castle grounds."), nl.
+    write("Enter 'w.' to leave the tower and return to the main castle grounds."), nl.
 
 
 description(boss) :-
+    status(king, dead),
     nl,
     write("The king drops to the ground, blood soaking his royal robes."), nl,
     write("You take his crown with the Crystal of Life and place it on your head."), nl,
-    write("Now you must go south to your home and restore balance to the land!"),
+    write("Now you must go south to your home and restore balance to the land!"), nl,
     assert(equipped(head_slot, crown)),
     retract(equipped(head_slot, nothing)).
+description(boss).
 
 /*
 Starts the game.
