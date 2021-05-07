@@ -2,6 +2,11 @@
 :- dynamic current_node_is/1, equipped/2, located/2, health/2, defense/2, attack/2, magic_attack/2, magic_defense/2, prev_node/1, status/2,
     king_status/2, gold/1, potion_count/2, interactable/2.
 
+/*
+To play the game load this file in SWI-Prolog (or any equivalent)
+and then type 'play.'
+*/
+
 different(X, X) :- !, fail.
 different(X, Y).
 
